@@ -215,15 +215,7 @@
 
           deepCopy: function(obj) {
             if( !angular.isObject(obj) ) { return obj; }
-            var newCopy = angular.isArray(obj) ? obj.slice() : angular.extend({}, obj);
-            for (var key in newCopy) {
-              if (newCopy.hasOwnProperty(key)) {
-                if (angular.isObject(newCopy[key])) {
-                  newCopy[key] = utils.deepCopy(newCopy[key]);
-                }
-              }
-            }
-            return newCopy;
+            return angular.merge(obj);
           },
 
           trimKeys: function(dest, source) {
@@ -442,4 +434,53 @@
       });
       return out;
     }
+
+  // polyfill for Angular 1.4 merge function: https://github.com/angular/angular.js/blob/v1.4.0-rc.1/src/Angular.js#L326
+  if( !angular.isFunction(angular.merge) ) {
+    var isObject = angular.isObject,
+      isFunction = angular.isFunction,
+      isArray = angular.isArray;
+
+    angular.merge = (function () {
+      function baseExtend(dst, objs, deep) {
+        var h = dst.$$hashKey;
+
+        for (var i = 0, ii = objs.length; i < ii; ++i) {
+          var obj = objs[i];
+          if (!isObject(obj) && !isFunction(obj)) {
+            continue;
+          }
+          var keys = Object.keys(obj);
+          for (var j = 0, jj = keys.length; j < jj; j++) {
+            var key = keys[j];
+            var src = obj[key];
+
+            if (deep && isObject(src)) {
+              if (!isObject(dst[key])) {
+                dst[key] = isArray(src) ? [] : {};
+              }
+              baseExtend(dst[key], [src], true);
+            } else {
+              dst[key] = src;
+            }
+          }
+        }
+
+        setHashKey(dst, h);
+        return dst;
+      }
+
+      function setHashKey(obj, h) {
+        if (h) {
+          obj.$$hashKey = h;
+        } else {
+          delete obj.$$hashKey;
+        }
+      }
+
+      return function(dst) {
+        baseExtend(dst, Array.prototype.slice.call(arguments, 1), true);
+      };
+    })();
+  }
 })();
